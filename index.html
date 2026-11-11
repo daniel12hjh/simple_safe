@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Safe · AI 보안 취약점 진단</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true">
+      <div class="orb orb-green"></div>
+      <div class="orb orb-blue"></div>
+      <div class="grid"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="34" height="34">
+            <defs>
+              <linearGradient id="logoGlow" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#3dff9a" />
+                <stop offset="100%" stop-color="#4ecbff" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M20 4 L32 9 V19 C32 27 27 33 20 36 C13 33 8 27 8 19 V9 Z"
+              fill="none"
+              stroke="url(#logoGlow)"
+              stroke-width="1.8"
+            />
+            <path
+              d="M14 20 L18.2 24.2 L26.5 15.5"
+              fill="none"
+              stroke="#3dff9a"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <div>
+          <h1>Simple Safe</h1>
+          <p>AI Vulnerability Scanner</p>
+        </div>
+      </div>
+      <div class="status-chip">
+        <span class="pulse"></span>
+        <span id="status-text">엔진 대기 중</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel input-panel" aria-labelledby="input-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">SOURCE</p>
+            <h2 id="input-title">검사할 코드</h2>
+          </div>
+          <label class="lang-select">
+            <span>언어</span>
+            <select id="language">
+              <option value="auto">자동</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+              <option value="php">PHP</option>
+              <option value="go">Go</option>
+            </select>
+          </label>
+        </div>
+
+        <details class="github-source">
+          <summary>GitHub 저장소에서 가져오기</summary>
+          <form id="github-connect" class="source-fields">
+            <label>저장소 <input id="github-repo" placeholder="owner/repo" required maxlength="250" /></label>
+            <label>브랜치 <input id="github-branch" placeholder="저장소 기본 브랜치" maxlength="120" /></label>
+            <button class="btn btn-ghost">파일 목록 가져오기</button>
+          </form>
+          <p id="github-message" class="small-hint" role="status"></p>
+          <div id="github-files" hidden>
+            <label>경로 검색 <input id="github-filter" type="search" /></label>
+            <div id="github-file-list" class="patch-list"></div>
+            <p id="github-selection" class="small-hint"></p>
+            <button type="button" id="github-load" class="btn btn-ghost" disabled>선택 파일 불러오기</button>
+          </div>
+        </details>
+
+        <label class="dropzone" id="dropzone">
+          <input id="file-input" type="file" multiple accept=".js,.ts,.jsx,.tsx,.py,.java,.php,.go,.cs,.rb,.c,.cpp,.sql" hidden />
+          <span class="drop-icon" aria-hidden="true">⬆</span>
+          <span>
+            파일을 끌어오거나 <em>클릭해서 업로드</em>
+            <small id="file-name">다중 파일 지원 (최대 12개) · JS, TS, Python, Java, PHP, Go 등</small>
+          </span>
+        </label>
+
+        <div class="folder-actions"><label for="folder-input" class="btn btn-ghost">프로젝트 폴더 선택</label><input id="folder-input" type="file" webkitdirectory directory multiple hidden /><span class="small-hint">폴더에서 지원 파일 최대 12개 로드</span></div>
+        <div class="source-fields source-editor">
+          <label>분석 파일 <select id="active-file"></select></label>
+          <label>파일 경로 <input id="file-path" placeholder="src/app.js" /></label>
+          <button type="button" id="edit-local" class="btn btn-ghost" hidden>로컬 복사본 편집</button>
+        </div>
+        <div class="editor">
+          <div class="gutter" id="gutter" aria-hidden="true"></div>
+          <textarea
+            id="code"
+            spellcheck="false"
+            placeholder="여기에 분석할 소스 코드를 붙여넣으세요."
+          ></textarea>
+        </div>
+
+        <label class="approval"><input id="use-ai" type="checkbox" />
+          Gemini 분석 및 패치 제안 사용 (선택한 소스가 Gemini로 전송됩니다)
+        </label>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="analyze-btn">
+            <span class="btn-glow"></span>
+            분석 시작
+          </button>
+          <button type="button" class="btn btn-ghost" id="pr-btn" disabled>
+            검토 후 Draft PR 생성
+          </button>
+        </div>
+      </section>
+
+      <section class="panel result-panel" aria-labelledby="result-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">REPORT</p>
+            <h2 id="result-title">보안 검사 결과</h2>
+          </div>
+        </div>
+
+        <div id="empty-state" class="empty-state">
+          <div class="radar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <p>코드를 입력한 뒤 <strong>분석 시작</strong>을 누르면<br />확인된 코드 패턴과 수정 제안이 여기에 표시됩니다.</p>
+        </div>
+
+        <div id="loading-state" class="loading-state" hidden>
+          <div class="scan-bar"></div>
+          <p>선택한 파일을 검사하는 중…</p>
+        </div>
+
+        <div id="result-state" hidden>
+          <p id="analysis-summary" class="analysis-summary"></p>
+          <details><summary>파일별 검사 범위</summary><ul id="coverage"></ul></details>
+          <div class="stats" id="stats"></div>
+
+          <div class="result-block">
+            <h3>검사 결과</h3>
+            <ul class="vuln-list" id="vuln-list"></ul>
+          </div>
+
+          <div class="result-block">
+            <h3>선택한 결과의 코드 근거</h3>
+            <div class="compare">
+              <article>
+                <header class="compare-head bad">원본 근거</header>
+                <pre id="bad-code"></pre>
+              </article>
+              <article>
+                <header class="compare-head good">패치 제안</header>
+                <pre id="secure-code"></pre>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="pr-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pr-title">
+        <h3 id="pr-title">GitHub Pull Request</h3>
+        <p>선택한 변경을 한 커밋으로 올리고 Draft PR을 생성합니다. 저장소에 쓰기 권한이 없으면 계정의 Fork를 사용하거나 생성합니다.</p>
+        <label>
+          Repository
+          <input id="repo" type="text" placeholder="owner/simple-safe" />
+        </label>
+        <label>
+          Base branch
+          <input id="base-branch" type="text" placeholder="저장소 기본 브랜치" />
+        </label>
+        <p id="pr-base"></p>
+        <p>GitHub 토큰은 서버 환경 변수로만 관리합니다.</p>
+        <h4>패치 선택 및 변경사항 미리보기</h4>
+        <div id="patch-list" class="patch-list"></div>
+        <pre id="patch-preview" class="patch-preview"></pre>
+        <label class="approval"><input id="approve-patches" type="checkbox" /> 수정 내용을 검토했으며 GitHub에 브랜치와 PR을 생성하는 데 동의합니다.</label>
+        <p class="modal-error" id="pr-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="pr-cancel">취소</button>
+          <button type="button" class="btn btn-primary" id="pr-submit">Draft PR 생성</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="js/app.js"></script>
+  </body>
+</html>
